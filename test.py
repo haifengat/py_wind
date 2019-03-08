@@ -5,10 +5,22 @@
 # @Time    : 2019/3/7
 # @desc    : test
 
-from py_wind.wind import Wind
+from py_wind.wind import Wind, StockTick
+import py_wind.stock_ids as ids
+
+def OnTick(tick:StockTick):
+    print(tick.__dict__)
 
 if __name__ == '__main__':
-    w = Wind()
-    df = w.get_history_day('000001.SH', '2019-03-01')
+    s = Wind()
+    # 历史行情
+    df = s.get_stock_ids(ids.BK_A)
     print(df)
-    w.stop()
+    df = s.get_history_min(ids.ZS_SH, '2019-01-01', period=5)
+    print(df)
+    # 实时行情
+    s.on_tick = OnTick
+    s.sub_quote('000001.SZ')
+    while input() != 'q':
+        continue
+    s.stop()

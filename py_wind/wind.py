@@ -10,6 +10,9 @@ from color_log import Logger
 import pandas as pd
 from pandas import DataFrame
 from WindPy import w
+from enum import Enum
+from .stock_tick import StockTick
+from .stock_ids import *
 
 
 class Wind(object):
@@ -18,6 +21,7 @@ class Wind(object):
     def __init__(self):
         """"""
         self.log = Logger()
+        self.ticks = {}
 
         w.start()
         if not w.isconnected():
@@ -25,12 +29,24 @@ class Wind(object):
             w.stop()
             raise Exception('登录失败')
 
+    def get_stock_ids(self, type: str) -> DataFrame:
+        """取板块的证券代码
+
+        :param type: 板块名称
+        :return: 股票代码
+        """
+        data = w.wset('sectorconstituent', f'sectorid={type}')
+        df: DataFrame = DataFrame(data.Data).T
+        df.columns = data.Fields
+        df.drop(columns=[data.Fields[0]], axis=1, inplace=True)
+        return df
+
     def get_history_day(self, stock_id: str, start_day: str, end_day: str = '') -> DataFrame:
         """取历史日线行情
 
         :param stock_id: 证券代码
-        :param start_day: 起始日期 yyyy-mm-dd
-        :param end_day: 结束日期 yyyy-mm-dd 默认:前一日
+        :param start_day: (含)起始日期 yyyy-mm-dd
+        :param end_day: (含)结束日期 yyyy-mm-dd 默认:前一日
         :return: index-日期 fields-pre_close,open,high,low,close,volume,amt
         """
         data = w.wsd(stock_id, "pre_close,open,high,low,close,volume,amt", start_day, end_day if end_day != '' else datetime.today() - timedelta(days=1))
@@ -88,84 +104,49 @@ class Wind(object):
         """
         if indata.ErrorCode != 0:
             return
-        date = int(indata.Data[indata.Fields.index('rt_date'.upper())][0])
-        time = int(indata.Data[indata.Fields.index('rt_time'.upper())][0])
-        high = indata.Data[indata.Fields.index('rt_high'.upper())][0]
-        last = indata.Data[indata.Fields.index('rt_last'.upper())][0]
-        last_vol = indata.Data[indata.Fields.index('rt_last_vol'.upper())][0]
-        latest = indata.Data[indata.Fields.index('rt_latest'.upper())][0]
-        pct_chg = indata.Data[indata.Fields.index('rt_pct_chg'.upper())][0]
-        chg = indata.Data[indata.Fields.index('rt_chg'.upper())][0]
-        high_limit = indata.Data[indata.Fields.index('rt_high_limit'.upper())][0]
-        low_limit = indata.Data[indata.Fields.index('rt_low_limit'.upper())][0]
-        trade_status = indata.Data[indata.Fields.index('rt_trade_status'.upper())][0]
-        ask1 = indata.Data[indata.Fields.index('rt_ask1'.upper())][0]
-        bid1 = indata.Data[indata.Fields.index('rt_bid1'.upper())][0]
-        bsize1 = indata.Data[indata.Fields.index('rt_bsize1'.upper())][0]
-        asize1 = indata.Data[indata.Fields.index('rt_asize1'.upper())][0]
-        ask2 = indata.Data[indata.Fields.index('rt_ask2'.upper())][0]
-        bid2 = indata.Data[indata.Fields.index('rt_bid2'.upper())][0]
-        bsize2 = indata.Data[indata.Fields.index('rt_bsize2'.upper())][0]
-        asize2 = indata.Data[indata.Fields.index('rt_asize2'.upper())][0]
-        ask3 = indata.Data[indata.Fields.index('rt_ask3'.upper())][0]
-        bid3 = indata.Data[indata.Fields.index('rt_bid3'.upper())][0]
-        bsize3 = indata.Data[indata.Fields.index('rt_bsize3'.upper())][0]
-        asize3 = indata.Data[indata.Fields.index('rt_asize3'.upper())][0]
-        ask4 = indata.Data[indata.Fields.index('rt_ask4'.upper())][0]
-        bid4 = indata.Data[indata.Fields.index('rt_bid4'.upper())][0]
-        bsize4 = indata.Data[indata.Fields.index('rt_bsize4'.upper())][0]
-        asize4 = indata.Data[indata.Fields.index('rt_asize4'.upper())][0]
-        ask5 = indata.Data[indata.Fields.index('rt_ask5'.upper())][0]
-        bid5 = indata.Data[indata.Fields.index('rt_bid5'.upper())][0]
-        bsize5 = indata.Data[indata.Fields.index('rt_bsize5'.upper())][0]
-        asize5 = indata.Data[indata.Fields.index('rt_asize5'.upper())][0]
-        self.on_tick(indata.Codes[0], date, time, high, last, last_vol, latest, pct_chg, chg, high_limit, low_limit, trade_status, ask1, bid1, bsize1, asize1, ask2, bid2, bsize2, asize2, ask3, bid3, bsize3, asize3, ask4, bid4, bsize4, asize4, ask5, bid5, bsize5, asize5)
+        stock_id = indata.Codes[0]
+        if stock_id not in self.ticks:
+            self.ticks[stock_id] = StockTick()
+            self.ticks[stock_id].StockId = stock_id
+        tick: StockTick = self.ticks[stock_id]
+        tick.DATE = int(indata.Data[indata.Fields.index('RT_DATE')][0] if 'RT_DATE' in indata.Fields else tick.DATE)
+        tick.TIME = int(indata.Data[indata.Fields.index('RT_TIME')][0] if 'RT_TIME' in indata.Fields else tick.TIME)
+        tick.HIGH = indata.Data[indata.Fields.index('RT_HIGH')][0] if 'RT_HIGH' in indata.Fields else tick.HIGH
+        tick.LAST = indata.Data[indata.Fields.index('RT_LAST')][0] if 'RT_LAST' in indata.Fields else tick.LAST
+        tick.LAST_VOL = indata.Data[indata.Fields.index('RT_LAST_VOL')][0] if 'RT_LAST_VOL' in indata.Fields else tick.LAST_VOL
+        tick.LATEST = indata.Data[indata.Fields.index('RT_LATEST')][0] if 'RT_LATEST' in indata.Fields else tick.LATEST
+        tick.PCT_CHG = indata.Data[indata.Fields.index('RT_PCT_CHG')][0] if 'RT_PCT_CHG' in indata.Fields else tick.PCT_CHG
+        tick.CHG = indata.Data[indata.Fields.index('RT_CHG')][0] if 'RT_CHG' in indata.Fields else tick.CHG
+        tick.HIGH_LIMIT = indata.Data[indata.Fields.index('RT_HIGH_LIMIT')][0] if 'RT_HIGH_LIMIT' in indata.Fields else tick.HIGH_LIMIT
+        tick.LOW_LIMIT = indata.Data[indata.Fields.index('RT_LOW_LIMIT')][0] if 'RT_LOW_LIMIT' in indata.Fields else tick.LOW_LIMIT
+        tick.TRADE_STATUS = indata.Data[indata.Fields.index('RT_TRADE_STATUS')][0] if 'RT_TRADE_STATUS' in indata.Fields else tick.TRADE_STATUS
+        tick.ASK1 = indata.Data[indata.Fields.index('RT_ASK1')][0] if 'RT_ASK1' in indata.Fields else tick.ASK1
+        tick.BID1 = indata.Data[indata.Fields.index('RT_BID1')][0] if 'RT_BID1' in indata.Fields else tick.BID1
+        tick.BSIZE1 = indata.Data[indata.Fields.index('RT_BSIZE1')][0] if 'RT_BSIZE1' in indata.Fields else tick.BSIZE1
+        tick.ASIZE1 = indata.Data[indata.Fields.index('RT_ASIZE1')][0] if 'RT_ASIZE1' in indata.Fields else tick.ASIZE1
+        tick.ASK2 = indata.Data[indata.Fields.index('RT_ASK2')][0] if 'RT_ASK2' in indata.Fields else tick.ASK2
+        tick.BID2 = indata.Data[indata.Fields.index('RT_BID2')][0] if 'RT_BID2' in indata.Fields else tick.BID2
+        tick.BSIZE2 = indata.Data[indata.Fields.index('RT_BSIZE2')][0] if 'RT_BSIZE2' in indata.Fields else tick.BSIZE2
+        tick.ASIZE2 = indata.Data[indata.Fields.index('RT_ASIZE2')][0] if 'RT_ASIZE2' in indata.Fields else tick.ASIZE2
+        tick.ASK3 = indata.Data[indata.Fields.index('RT_ASK3')][0] if 'RT_ASK3' in indata.Fields else tick.ASK3
+        tick.BID3 = indata.Data[indata.Fields.index('RT_BID3')][0] if 'RT_BID3' in indata.Fields else tick.BID3
+        tick.BSIZE3 = indata.Data[indata.Fields.index('RT_BSIZE3')][0] if 'RT_BSIZE3' in indata.Fields else tick.BSIZE3
+        tick.ASIZE3 = indata.Data[indata.Fields.index('RT_ASIZE3')][0] if 'RT_ASIZE3' in indata.Fields else tick.ASIZE3
+        tick.ASK4 = indata.Data[indata.Fields.index('RT_ASK4')][0] if 'RT_ASK4' in indata.Fields else tick.ASK4
+        tick.BID4 = indata.Data[indata.Fields.index('RT_BID4')][0] if 'RT_BID4' in indata.Fields else tick.BID4
+        tick.BSIZE4 = indata.Data[indata.Fields.index('RT_BSIZE4')][0] if 'RT_BSIZE4' in indata.Fields else tick.BSIZE4
+        tick.ASIZE4 = indata.Data[indata.Fields.index('RT_ASIZE4')][0] if 'RT_ASIZE4' in indata.Fields else tick.ASIZE4
+        tick.ASK5 = indata.Data[indata.Fields.index('RT_ASK5')][0] if 'RT_ASK5' in indata.Fields else tick.ASK5
+        tick.BID5 = indata.Data[indata.Fields.index('RT_BID5')][0] if 'RT_BID5' in indata.Fields else tick.BID5
+        tick.BSIZE5 = indata.Data[indata.Fields.index('RT_BSIZE5')][0] if 'RT_BSIZE5' in indata.Fields else tick.BSIZE5
+        tick.ASIZE5 = indata.Data[indata.Fields.index('RT_ASIZE5')][0] if 'RT_ASIZE5' in indata.Fields else tick.ASIZE5
 
-    def on_tick(self, stock_id: str, date, time, high, last, last_vol, latest, pct_chg, chg, high_limit, low_limit, trade_status, ask1, bid1, bsize1, asize1, ask2, bid2, bsize2, asize2, ask3, bid3, bsize3, asize3, ask4, bid4, bsize4, asize4, ask5, bid5, bsize5, asize5):
+        self.on_tick(tick)
+
+    def on_tick(self, tick: StockTick):
         """重写函数获取实时行情
 
-        :param stock_id:
-        :param date:
-        :param time:
-        :param high:
-        :param last:
-        :param last_vol:
-        :param latest:
-        :param pct_chg:
-        :param chg:
-        :param high_limit:
-        :param low_limit:
-        :param trade_status: 未知-0  可交易-1  休市/暂停交易-2 收盘-3  集合竞价-4  暂停交易(深交所停牌/熔断)-5  盘前交易-8  盘后交易-9  期权波动性中断-10  可恢复熔断-11  不可恢复熔断-12
-        :param ask1:
-        :param bid1:
-        :param bsize1:
-        :param asize1:
-        :param ask2:
-        :param bid2:
-        :param bsize2:
-        :param asize2:
-        :param ask3:
-        :param bid3:
-        :param bsize3:
-        :param asize3:
-        :param ask4:
-        :param bid4:
-        :param bsize4:
-        :param asize4:
-        :param ask5:
-        :param bid5:
-        :param bsize5:
-        :param asize5:
+        :param tick 分笔行情
         :return:
         """
-        print(f'{stock_id}, {date}, {time}, {high}, {last}, {last_vol}, {latest}, {pct_chg}, {chg}, {high_limit}, {low_limit}, {trade_status}, {ask1}, {bid1}, {bsize1}, {asize1}, {ask2}, {bid2}, {bsize2}, {asize2}, {ask3}, {bid3}, {bsize3}, {asize3}, {ask4}, {bid4}, {bsize4}, {asize4}, {ask5}, {bid5}, {bsize5}, {asize5}')
-
-
-if __name__ == '__main__':
-    s = Wind()
-    # df = s.get_history_min('000001.SZ', '2019-01-01', period=5)
-    # print(df)
-    s.sub_quote('000001.SZ')
-    while input() != 'q':
-        continue
-    s.stop()
+        pass
