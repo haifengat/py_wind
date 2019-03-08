@@ -64,6 +64,7 @@ class Wind(object):
         """
         data = w.wsi(stock_id, "open,high,low,close,volume,amt", start_day, end_day if end_day != '' else datetime.today() - timedelta(days=1), f'BarSize={period}')
         df: DataFrame = DataFrame(data.Data, columns=data.Times, index=data.Fields).T  # .T 行列转换
+        df.rename(columns={'amount': 'amt'}, inplace=True)
         return df
 
     def get_filter_stocks(self, filtername) -> list:
