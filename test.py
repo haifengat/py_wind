@@ -7,16 +7,21 @@
 
 from py_wind.wind import Wind, StockTick
 import py_wind.stock_ids as ids
+from datetime import datetime, timedelta
 
-def OnTick(tick:StockTick):
+
+def OnTick(tick: StockTick):
     print(tick.__dict__)
+
 
 if __name__ == '__main__':
     s = Wind()
     # 历史行情
-    df = s.get_stock_ids(ids.BK_A)
-    print(df)
-    df = s.get_history_min(ids.ZS_SH, '2019-01-01', period=5)
+    # df = s.get_stock_ids(ids.BK_A)
+    # print(df)
+    b = datetime.today() - timedelta(days=1)
+    e = datetime.today()
+    df = s.get_history_min(ids.ZS_SH, b.strftime('%Y-%m-%d'), e.strftime('%Y-%m-%d'))
     print(df)
     # 实时行情
     s.on_tick = OnTick

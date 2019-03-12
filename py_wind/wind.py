@@ -51,6 +51,7 @@ class Wind(object):
         """
         data = w.wsd(stock_id, "pre_close,open,high,low,close,volume,amt", start_day, end_day if end_day != '' else datetime.today() - timedelta(days=1))
         df: DataFrame = DataFrame(data.Data, columns=data.Times, index=data.Fields).T  # .T 行列转换
+        df.index.names = ['tradingday']
         return df
 
     def get_history_min(self, stock_id: str, start_day: str, end_day: str = '', period=1) -> DataFrame:
@@ -65,6 +66,7 @@ class Wind(object):
         data = w.wsi(stock_id, "open,high,low,close,volume,amt", start_day, end_day if end_day != '' else datetime.today() - timedelta(days=1), f'BarSize={period}')
         df: DataFrame = DataFrame(data.Data, columns=data.Times, index=data.Fields).T  # .T 行列转换
         df.rename(columns={'amount': 'amt'}, inplace=True)
+        df.index.names = ['tradingday']
         return df
 
     def get_filter_stocks(self, filtername) -> list:

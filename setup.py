@@ -35,7 +35,7 @@ os.system("pipreqs ./ --encoding='utf-8' --force")
 setup(
     name='py_wind',  # 包名
     python_requires='>=3.4.0',  # python环境
-    version='0.0.4',  # 包的版本
+    version='0.0.5',  # 包的版本
     description="Python Wind api",  # 包简介，显示在PyPI上
     long_description=long_description,  # 读取的Readme文档内容
     long_description_content_type=long_description_content_type,  # 指定包文档格式为markdown
