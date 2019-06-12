@@ -29,6 +29,17 @@ class Wind(object):
             w.stop()
             raise Exception('登录失败')
 
+    def get_pe_div(self, stock_id: str, start_day: str, end_day: str = '', days='Alldays') -> DataFrame:
+        """ 取股票的市盈率PE(TTM)(pe_ttm)和股息率(近12个月)(dividendyield2)
+
+        :param stock: 股票代码
+        :param start_day: 交易日yyyyMMdd
+        :param end_day: 结束日
+        :param days: 日期类型:Alldays日历;Weekdays工作日;''交易日
+        :return:
+        """
+        return self._get_wsd(stock_id, "pe_ttm,dividendyield2", start_day, end_day, days)
+
     def get_stock_ids(self, type: str) -> DataFrame:
         """取板块的证券代码
 
@@ -41,15 +52,43 @@ class Wind(object):
         df.drop(columns=[data.Fields[0]], axis=1, inplace=True)
         return df
 
-    def get_history_day(self, stock_id: str, start_day: str, end_day: str = '') -> DataFrame:
+    def get_history_day(self, stock_id: str, start_day: str, end_day: str = '', days='Alldays') -> DataFrame:
         """取历史日线行情
 
         :param stock_id: 证券代码
         :param start_day: (含)起始日期 yyyy-mm-dd
         :param end_day: (含)结束日期 yyyy-mm-dd 默认:前一日
+        :param days: 日期类型:Alldays日历;Weekdays工作日;''交易日
         :return: index-日期 fields-pre_close,open,high,low,close,volume,amt
         """
-        data = w.wsd(stock_id, "pre_close,open,high,low,close,volume,amt", start_day, end_day if end_day != '' else datetime.today() - timedelta(days=1))
+        return self._get_wsd(stock_id, "pre_close,open,high,low,close,volume,amt", start_day, end_day, days)
+
+    def get_edb(self, stock_id, start_day, end_day: str = '', days='Alldays') -> DataFrame:
+        """ 获取经济数据
+
+        :param stock_id:
+        :param start_day:
+        :param end_day:
+        :param days: 日期类型:Alldays日历;Weekdays工作日;''交易日
+        :return:
+        """
+        data = w.edb(stock_id, start_day, end_day if end_day != '' else datetime.today() - timedelta(days=1), f"credibility=1;Days={days};Fill=Previous")
+        # 用stock_id作为列头
+        df: DataFrame = DataFrame(data.Data, columns=data.Times, index=stock_id.split(',')).T  # .T 行列转换
+        df.index.names = ['tradingday']
+        return df
+
+    def _get_wsd(self, stock_id, fields, start_day, end_day, days='Alldays') -> DataFrame:
+        """取历史日线数据
+
+        :param stock_id: 证券代码
+        :param fields: 字段名
+        :param start_day: (含)起始日期 yyyy-mm-dd
+        :param end_day: (含)结束日期 yyyy-mm-dd 默认:前一日
+        :param days: 日期类型:Alldays日历;Weekdays工作日;''交易日
+        :return: index-日期 fields-pre_close,open,high,low,close,volume,amt
+        """
+        data = w.wsd(stock_id, fields, start_day, end_day if end_day != '' else datetime.today() - timedelta(days=1), "credibility=1;Days=Alldays;Fill=Previous")
         df: DataFrame = DataFrame(data.Data, columns=data.Times, index=data.Fields).T  # .T 行列转换
         df.index.names = ['tradingday']
         return df
